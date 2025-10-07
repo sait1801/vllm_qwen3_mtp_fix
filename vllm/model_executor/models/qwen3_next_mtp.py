@@ -252,12 +252,17 @@ class Qwen3NextMTP(nn.Module, SupportsPP):
             "Qwen3NextMTP currently does not support prefix caching"
         )
 
+        from copy import deepcopy
+        mtp_vllm_config = deepcopy(vllm_config)
+        mtp_vllm_config.quant_config = None  # ← Disable quantization for MTP
+
+        super().__init__()
         self.quant_config = vllm_config.quant_config
 
         super().__init__()
         self.config = config
         self.model = Qwen3NextMultiTokenPredictor(
-            vllm_config=vllm_config, prefix=maybe_prefix(prefix, "mtp")
+            vllm_config=mtp_vllm_config, prefix=maybe_prefix(prefix, "mtp")
         )
         self.unpadded_vocab_size = config.vocab_size
         self.lm_head = ParallelLMHead(
