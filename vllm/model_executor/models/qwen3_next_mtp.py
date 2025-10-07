@@ -82,9 +82,20 @@ class Qwen3NextMultiTokenPredictor(nn.Module):
         )
 
         # Create a temporary vllm_config with quant_config=None for MTP layers
-        from copy import deepcopy
-        mtp_vllm_config = deepcopy(vllm_config)
-        mtp_vllm_config.quant_config = mtp_quant_config
+        mtp_vllm_config = VllmConfig(
+            model_config=vllm_config.model_config,
+            cache_config=vllm_config.cache_config,
+            parallel_config=vllm_config.parallel_config,
+            scheduler_config=vllm_config.scheduler_config,
+            device_config=vllm_config.device_config,
+            lora_config=vllm_config.lora_config,
+            speculative_config=vllm_config.speculative_config,
+            load_config=vllm_config.load_config,
+            decoding_config=vllm_config.decoding_config,
+            observability_config=vllm_config.observability_config,
+            compilation_config=vllm_config.compilation_config,
+            quant_config=None,  # ← Full precision for MTP
+        )
 
         self.layers = torch.nn.ModuleList(
             Qwen3NextDecoderLayer(
