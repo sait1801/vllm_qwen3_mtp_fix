@@ -47,7 +47,8 @@ class Qwen3NextMultiTokenPredictor(nn.Module):
         super().__init__()
 
         model_config = vllm_config.model_config
-        quant_config = vllm_config.quant_config
+        # ⚠️ OVERRIDE: Force MTP to use NO quantization
+        mtp_quant_config = None  # This disables AWQ/FP8/GPTQ for MTP
         lora_config = vllm_config.lora_config
         config: Qwen3NextConfig = model_config.hf_config
 
@@ -69,19 +70,25 @@ class Qwen3NextMultiTokenPredictor(nn.Module):
             org_num_embeddings=config.vocab_size,
         )
 
+        # Use mtp_quant_config (None) → FP16
         self.fc = ColumnParallelLinear(
             self.config.hidden_size * 2,
             self.config.hidden_size,
             gather_output=True,
             bias=False,
             return_bias=False,
-            quant_config=quant_config,
+            quant_config=mtp_quant_config,  # ← PATCHED
             prefix=f"{prefix}.fc",
         )
 
+        # Create a temporary vllm_config with quant_config=None for MTP layers
+        from copy import deepcopy
+        mtp_vllm_config = deepcopy(vllm_config)
+        mtp_vllm_config.quant_config = mtp_quant_config
+
         self.layers = torch.nn.ModuleList(
             Qwen3NextDecoderLayer(
-                vllm_config,
+                mtp_vllm_config,  # ← PATCHED: uses no quant
                 layer_type="full_attention",
                 prefix=f"{prefix}.layers.{idx}",
             )
